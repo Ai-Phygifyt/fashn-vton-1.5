@@ -19,6 +19,13 @@ pipeline, and training validation on a 4 GB consumer GPU.
 This repository contains the **complete fine-tuning pipeline** built on top of the FASHN-VTON v1.5
 inference code, which ships without any training implementation.
 
+![Unseen subject results](assets/results_unseen_subject.jpg)
+
+*A subject from outside the dataset entirely. Left to right: input photograph, the flat saree supplied,
+the pretrained model, and the fine-tuned model. The pretrained model produces a crop top and shorts in
+every case; the fine-tuned model produces a full-length draped garment in the correct colour, carrying
+across border and embroidery detail.*
+
 ---
 
 ## Contents
@@ -190,9 +197,14 @@ mismatch is the root cause of the baseline failure** characterised in §5.
 - **Identity is preserved.** Face, hair, skin tone, pose and background remain intact.
 - Quality degrades on mannequin subjects and on source images below 512 px.
 
+![Baseline failure](assets/baseline_failure.jpg)
+
+**Figure 1. Representative baseline failure.** An organza saree is rendered as a tunic with loose
+trousers; this sample recorded SSIM 0.887, the highest score of all 240 baseline generations.
+
 > ❗ **Metric reliability — a result governing all subsequent evaluation.**
-> One baseline sample rendered an organza saree as a tunic with loose trousers — a complete category
-> failure — yet recorded **SSIM 0.887, the highest score of all 240 generations**. Pixel-wise metrics
+> The sample above is a complete category failure yet achieved the best similarity score in the
+> baseline. Pixel-wise metrics
 > compare all pixels, the majority of which are background, skin and hair, content the model
 > reproduces faithfully. The garment occupies a minority of the frame, and its *shape* is precisely
 > what these metrics evaluate least well.
@@ -337,9 +349,15 @@ Two runs were executed with a single variable changed, isolating one parameter p
 | Wall-clock | ~55 min | 1.76 h |
 | **Conclusion** | Learning rate too high | **Adopted configuration** |
 
-Experiment 1's loss decreased until approximately step 150 then rose, with gradient-norm spikes
-confirming instability. Experiment 2 decreased smoothly and monotonically across all 450 steps, with
-flat gradient norms and constant memory occupancy.
+![Experiment 1 curves](assets/curves_exp1.png)
+
+**Figure 2. Experiment 1 — learning rate 5×10⁻⁴.** Loss decreases until approximately step 150 then
+rises, with gradient-norm spikes (lower right) confirming instability; the run was terminated.
+
+![Experiment 2 curves](assets/curves_exp2.png)
+
+**Figure 3. Experiment 2 — learning rate 1×10⁻⁴.** Loss decreases smoothly and monotonically across
+all 450 steps, with flat gradient norms and constant memory occupancy (grey trace).
 
 ---
 
@@ -354,6 +372,11 @@ functions correctly. If a model cannot memorise a handful of samples, additional
 - Training set: **24 manually verified saree pairs**, selected for diversity of colour, fabric and
   source store, and individually inspected. Frozen manifest: [`eval/overfit_subset.csv`](eval/overfit_subset.csv).
 - Success criterion: the model should reproduce those 24 samples in both colour and drape.
+
+![Training subset](assets/training_subset.jpg)
+
+**Figure 4. Overfit validation subset.** The 24 manually verified training pairs, each cell showing the
+subject photograph and the flat saree supplied as the garment input.
 
 ### 9.1 Training stability and reliability
 
@@ -384,8 +407,11 @@ functions correctly. If a model cannot memorise a handful of samples, additional
 
 ### 10.1 Reproduction of training sarees
 
-The pretrained model produces short dresses and gowns; after fine-tuning the model reproduces each
-saree in the correct colour with shoulder drape and border, closely matching ground truth.
+![Progression](assets/results_progression.jpg)
+
+**Figure 5. Output progression across training stages.** Each row shows ground truth, the garment
+supplied, and model output at four stages; the pretrained model produces short dresses and gowns, while
+the fine-tuned model reproduces each saree in the correct colour with shoulder drape and border.
 
 **Evaluation metrics — measured against ground truth**
 
@@ -415,6 +441,11 @@ conditions, and ordinary clothing rather than a saree.
 - **Identity fully preserved** — face, hair, skin tone, pose and studio background unchanged, despite
   the subject lying far outside the training distribution.
 
+![Unseen subject](assets/results_unseen_subject.jpg)
+
+**Figure 6. Unseen subject — baseline versus fine-tuned.** Left to right: the subject, the flat saree
+supplied, the pretrained model output, and the fine-tuned model output.
+
 ### 10.3 Flat-lay versus worn garment input
 
 - Supplied with a photograph of a model **already wearing** the saree, the pretrained model performs
@@ -423,9 +454,10 @@ conditions, and ordinary clothing rather than a saree.
 - Fine-tuning closes precisely this gap — the commercially relevant case, since retailers hold flat
   product photography.
 
-> 🖼️ **Visual results.** Comparison boards (ground truth → garment → baseline → fine-tuned), loss
-> curves and the full engineering report are distributed separately, as they embed dataset imagery
-> that is copyrighted retailer product photography and not licensed for public redistribution.
+![Flat vs worn](assets/results_flat_vs_worn.jpg)
+
+**Figure 7. Same garment supplied two ways.** Columns 3–4 show output from a flat-lay input before and
+after fine-tuning; columns 6–7 show output from a worn-garment input before and after.
 
 ---
 
