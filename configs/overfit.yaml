@@ -1,0 +1,101 @@
+# Phase 4 overfit-validation config.
+#
+# Purpose: prove the pipeline can drive the loss toward zero on a handful of samples.
+# If a model cannot overfit 8 samples, no amount of data will help — this is the
+# cheapest possible correctness check on the whole training stack.
+#
+# Deliberately differs from default.yaml:
+#   * tiny sample count, no shuffle benefit
+#   * higher LR and rank (we WANT rapid memorisation)
+#   * no CFG dropout (it only adds noise when memorising)
+#   * no weight decay (regularisation fights overfitting, which is the goal here)
+#   * frequent checkpoints and validation on the same samples
+#
+#   python -m fashn_vton.training.train --config configs/overfit.yaml
+
+data:
+  dataset_root: dataset
+  index: dataset/index.parquet
+  train_csv: data_clean/clean_train.csv
+  val_csv: data_clean/clean_validation.csv
+  cache_dir: data_cache
+  height: 864
+  width: 576
+  category: one-pieces
+  use_agnostic_mask: true
+  num_workers: 2
+  pin_memory: true
+  persistent_workers: true
+  prefetch_factor: 2
+  drop_last: false
+  hflip_prob: 0.0
+  max_train_samples: 8
+  max_val_samples: 8
+
+lora:
+  rank: 32
+  alpha: 64
+  dropout: 0.0
+  preset: attention_mlp_mod   # include modulation: the class prior is what we must move
+  target_modules: []
+  include_blocks: [double_blocks, single_blocks, x_patch_mixer]
+  init_scale: 0.01
+
+optim:
+  optimizer: adamw8bit
+  lr: 0.0005
+  weight_decay: 0.0
+  betas: [0.9, 0.999]
+  eps: 1.0e-08
+  max_grad_norm: 1.0
+  scheduler: constant
+  warmup_steps: 20
+  min_lr_ratio: 1.0
+
+train:
+  epochs: 200
+  max_steps: 400
+  batch_size: 1
+  grad_accum_steps: 4
+  timestep_sampling: shifted
+  time_shift_mu: 1.5
+  cond_dropout_prob: 0.0
+  loss: mse
+  loss_weighting: uniform
+  seed: 42
+
+memory:
+  precision: bf16
+  gradient_checkpointing: true
+  empty_cache_every: 25
+  gc_every: 100
+  oom_retry: true
+  oom_max_retries: 2
+  set_alloc_conf: true
+  aux_device: cpu
+
+checkpoint:
+  dir: checkpoints
+  save_every_steps: 100
+  save_every_epochs: 50
+  keep_last: 3
+  save_best: true
+  monitor: val_loss
+  monitor_mode: min
+  resume: auto
+
+log:
+  dir: logs
+  run_name: overfit
+  log_every_steps: 5
+  val_every_steps: 50
+  tensorboard: true
+  log_system_metrics: true
+
+eval:
+  metrics: [ssim, psnr, lpips]
+  num_timesteps: 30
+  guidance_scale: 1.5
+  seed: 42
+
+weights_dir: weights

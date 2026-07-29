@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# Model weights (download with scripts/download_weights.py)
+weights/
+
+# Dataset — copyrighted product photography, not redistributed
+dataset/
+raw/
+
+# Generated artifacts
+data_cache/
+data_clean/
+checkpoints/
+logs/
+outputs/
+reports/
+debug_outputs/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
