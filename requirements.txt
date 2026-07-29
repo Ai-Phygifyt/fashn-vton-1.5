@@ -1,0 +1,44 @@
+# Saree Virtual Try-On — Python 3.10-3.12
+#
+# Install PyTorch first, matched to your CUDA version:
+#   https://pytorch.org/get-started/locally/
+#   e.g. pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+# then:  pip install -r requirements.txt
+#
+# Pinned lower bounds reflect the versions this pipeline was developed and verified
+# against; newer patch releases are expected to work.
+
+# ---- core ----
+torch>=2.0.0
+torchvision>=0.15.0
+safetensors>=0.3.0
+huggingface_hub>=0.20.0
+einops>=0.6.0
+numpy>=1.21.0
+pillow>=9.0.0
+opencv-python>=4.5.0
+tqdm>=4.65.0
+PyYAML>=6.0
+
+# ---- pose detection and human parsing ----
+# onnxruntime-gpu needs a matching CUDA/cuDNN. For CPU-only, replace with:
+#   pip uninstall onnxruntime-gpu && pip install onnxruntime
+onnxruntime-gpu>=1.14.0
+fashn-human-parser>=0.1.1
+
+# ---- dataset handling ----
+pandas>=2.0.0
+pyarrow>=12.0.0
+
+# ---- training ----
+bitsandbytes>=0.41.0      # 8-bit AdamW; halves optimiser memory
+tensorboard>=2.12.0       # training curves
+psutil>=5.9.0             # RAM / CPU telemetry in the training log
+
+# ---- evaluation ----
+scikit-image>=0.20.0      # SSIM, PSNR
+lpips>=0.1.4              # perceptual distance
+matplotlib>=3.5.0         # loss-curve plots
+
+# ---- development ----
+pytest>=7.0.0

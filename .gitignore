@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Model weights — fetch with scripts/download_weights.py
+weights/
+
+# Dataset — download separately (see README)
+dataset/
+dataset_handoff/
+raw/
+
+# Generated at runtime
+data_cache/
+data_clean/
+checkpoints/*
+!checkpoints/.gitkeep
+logs/
+outputs/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store

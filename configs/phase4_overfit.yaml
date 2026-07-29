@@ -1,0 +1,179 @@
+# Phase 4 — overfit validation.
+#
+# Goal: prove the training pipeline can LEARN. Not to produce a usable model.
+# Success = training loss falls substantially and outputs visibly change.
+#
+# Every value below is chosen for debuggability, not generalisation. Justifications:
+#
+#   optim.lr = 5e-4
+#     10x the Phase 3 default (1e-4). We WANT rapid memorisation; a conservative LR
+#     makes a working pipeline look broken within a short run. LoRA with zero-init B is
+#     tolerant of high LR because the update starts from exactly the base model.
+#
+#   lora.rank = 32 / alpha = 64  (preset attention_mlp_mod)
+#     Rank 32 gives ~30 M trainable params (3% of the model) — ample capacity to
+#     memorise 24 samples. `attention_mlp_mod` includes the adaLN `lin` layers, which
+#     are driven by the timestep+class vector and are therefore the path most able to
+#     move CATEGORY behaviour. That matters because the failure we ultimately need to
+#     fix is the `one-pieces` dress prior (CONTEXT.md §16.7). alpha = 2*rank is the
+#     standard pairing (scaling = 2.0).
+#
+#   train.batch_size = 1
+#     Hard VRAM limit, measured. Not a choice.
+#
+#   train.grad_accum_steps = 4  -> effective batch 4
+#     Small enough that 24 samples give 6 optimiser steps/epoch (frequent updates =
+#     fast memorisation), large enough to smooth the gradient. Larger accumulation
+#     would waste wall-clock for no benefit at this scale.
+#
+#   train.epochs / max_steps = 100 / 500
+#     ~500 optimiser steps over 24 samples = ~83 passes per sample. Comfortably enough
+#     to memorise if the pipeline is correct; if loss is flat by step 500 something is
+#     genuinely wrong.
+#
+#   optim.scheduler = constant, warmup_steps = 20
+#     Constant LR isolates the variable under test. A decaying schedule would make a
+#     flattening loss curve ambiguous ("did it stop learning, or did the LR just go to
+#     zero?"). Short warmup only to avoid a first-step shock.
+#
+#   optim.optimizer = adamw8bit
+#     Halves optimiser state vs fp32 AdamW (measured: checkpoints 358 MB -> 180 MB) at
+#     no observed quality cost. Same optimiser Phase 5 will use.
+#
+#   optim.weight_decay = 0.0
+#     Weight decay is regularisation; regularisation opposes overfitting, which is the
+#     entire objective here. Non-zero decay would confound the result.
+#
+#   optim.max_grad_norm = 1.0
+#     Kept ON despite the high LR — clipping is cheap insurance against a single bad
+#     batch destroying the run, and we log grad-norm so we can see if it ever binds.
+#
+#   train.cond_dropout_prob = 0.0
+#     CFG dropout randomly blanks the conditioning. That is essential for a general
+#     model but pure noise when memorising, and it would make the loss curve jump
+#     between conditioned and unconditioned batches. Phase 5 must restore this to 0.1.
+#
+#   train.timestep_sampling = shifted (mu 1.5)
+#     Matches the inference schedule so train and sampling agree (CONTEXT.md §23.1).
+#
+#   memory.precision = bf16
+#     Native checkpoint dtype; no loss scaler needed, removing an instability class.
+#
+#   memory.gradient_checkpointing = true
+#     Mandatory, not optional — native resolution OOMs without it (§25.3).
+#
+#   data.height/width = 648x432
+#     Phase 3 measured a memory-pressure cliff at 864x576: 24.0 s/step vs 3.4 s/step
+#     here, for only 1.8x the tokens. 648x432 makes this run ~2 h instead of ~14 h.
+#
+#   data.use_agnostic_mask = true
+#     The honest try-on objective. With masking off the model can see the answer and
+#     copy it, so a falling loss would prove nothing (§13.3).
+
+data:
+  dataset_root: dataset
+  train_csv: dataset/train.csv
+  val_csv: dataset/val.csv
+  cache_dir: data_cache
+  height: 648
+  width: 432
+  category: one-pieces
+  use_agnostic_mask: true
+  num_workers: 2
+  pin_memory: true
+  persistent_workers: true
+  prefetch_factor: 2
+  drop_last: false
+  hflip_prob: 0.0
+  max_train_samples: null
+  max_val_samples: null
+
+cleaning:
+  max_person_fraction: 0.002
+  require_hi_res: true
+  drop_duplicates: true
+  min_garment_score: 0.0
+  reject_blouse_renders: true
+  blouse_top_lo: 0.10
+  blouse_top_hi: 0.35
+  enable_sketch_filter: false
+  max_flat_fraction: 0.9
+  min_colorfulness: 8.0
+  enable_collage_filter: false
+  max_foreground_components: 3
+  min_component_area_frac: 0.02
+  val_fraction: 0.05
+  seed: 1337
+
+lora:
+  rank: 32
+  alpha: 64
+  dropout: 0.0
+  preset: attention_mlp_mod
+  target_modules: []
+  include_blocks: [double_blocks, single_blocks, x_patch_mixer]
+  init_scale: 0.01
+
+optim:
+  optimizer: adamw8bit
+  lr: 0.0005
+  weight_decay: 0.0
+  betas: [0.9, 0.999]
+  eps: 1.0e-08
+  max_grad_norm: 1.0
+  scheduler: constant
+  warmup_steps: 20
+  min_lr_ratio: 1.0
+
+train:
+  epochs: 100
+  max_steps: 500
+  batch_size: 1
+  grad_accum_steps: 4
+  timestep_sampling: shifted
+  time_shift_mu: 1.5
+  logit_normal_mean: 0.0
+  logit_normal_std: 1.0
+  cond_dropout_prob: 0.0
+  loss: mse
+  huber_delta: 1.0
+  loss_weighting: uniform
+  seed: 42
+
+memory:
+  precision: bf16
+  gradient_checkpointing: true
+  empty_cache_every: 50
+  gc_every: 200
+  oom_retry: true
+  oom_max_retries: 2
+  set_alloc_conf: true
+  aux_device: cpu
+
+checkpoint:
+  dir: checkpoints
+  save_every_steps: 100
+  save_every_epochs: 20
+  keep_last: 6
+  save_best: true
+  monitor: val_loss
+  monitor_mode: min
+  resume: auto
+
+log:
+  dir: logs
+  run_name: phase4_overfit
+  log_every_steps: 5
+  val_every_steps: 25
+  tensorboard: true
+  log_system_metrics: true
+  sample_every_steps: 0
+
+eval:
+  metrics: [ssim, psnr, lpips]
+  num_timesteps: 30
+  guidance_scale: 1.5
+  seed: 42
+  max_samples: null
+
+weights_dir: weights
